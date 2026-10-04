@@ -31,5 +31,3 @@ Identificar:
 - quais dispositivos predominam em cada plataforma;
 - se existem diferenças de uso por gênero;
 - como a média de idade e tempo de uso variam entre as plataformas.
-
-## Estrutura do projeto

@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(page_title="Visualizador de Dados de impacto da IA em estudantes", layout="wide")
-st.title("Visualizador de Dados")
+st.title("Visualizador de Dados de impacto da IA em estudantes")
 
 # 1. Cria o botão de upload na tela
 arquivo_postado = st.file_uploader("Escolha um arquivo:", type=["csv", "xlsx"])
@@ -29,6 +29,10 @@ if arquivo_postado is not None:
         'Mental_Health_Score': 'Pontuação de Saúde Mental',
         'Physical_Health_Score': 'Pontuação de Saúde Física'
     })
+
+    #Excluindo colunas desnecessárias
+    colunas_para_excluir = ['Estudante_ID']
+    df = df.drop(columns=colunas_para_excluir)
 
     # 4. Mostra os dados (dentro do bloco 'if', garantindo que o df existe)
     st.subheader("Visualizando o DataFrame:")

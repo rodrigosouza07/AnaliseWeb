@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Visualizador de Dados de impacto da IA em estudantes", layout="wide")
 st.title("Visualizador de Dados de impacto da IA em estudantes")
@@ -34,6 +35,84 @@ if arquivo_postado is not None:
     colunas_para_excluir = ['Estudante_ID']
     df = df.drop(columns=colunas_para_excluir)
 
-    # 4. Mostra os dados (dentro do bloco 'if', garantindo que o df existe)
-    st.subheader("Visualizando o DataFrame:")
-    st.dataframe(df)
+    # Indicadores resumidos para uma leitura rápida do conjunto de dados
+    st.subheader("Painel de indicadores")
+    indicadores = [("Estudantes analisados", f"{len(df)}")]
+    indicadores_numericos = [
+        ('Idade', "Idade média", " anos"),
+        ('Média de Uso de Ferramentas de IA', "Uso médio de IA", " h/dia"),
+        ('Horas de Sono', "Sono médio", " h/dia"),
+        ('Pontuação de Saúde Mental', "Saúde mental média", ""),
+    ]
+    for coluna, rotulo, unidade in indicadores_numericos:
+        if coluna in df.columns:
+            valores = pd.to_numeric(df[coluna], errors='coerce')
+            media = valores.mean()
+            if pd.notna(media):
+                indicadores.append((rotulo, f"{media:.1f}{unidade}"))
+
+    cards = st.columns(len(indicadores))
+    for card, (rotulo, valor) in zip(cards, indicadores):
+        card.metric(rotulo, valor)
+
+    # Gráficos: uso médio de IA por gênero, relação com idade e nível de
+    # escolaridade mais frequente.
+    col_genero = 'Gênero'
+    col_idade = 'Idade'
+    col_uso_ia = 'Média de Uso de Ferramentas de IA'
+    col_escolaridade = 'Nível de Educação'
+
+    if all(coluna in df.columns for coluna in [col_genero, col_idade, col_uso_ia, col_escolaridade]):
+        dados_graficos = df.copy()
+        dados_graficos[col_idade] = pd.to_numeric(dados_graficos[col_idade], errors='coerce')
+        dados_graficos[col_uso_ia] = pd.to_numeric(dados_graficos[col_uso_ia], errors='coerce')
+        dados_graficos = dados_graficos.dropna(
+            subset=[col_genero, col_idade, col_uso_ia, col_escolaridade]
+        )
+
+        st.subheader("Análise de idade, uso de IA e escolaridade")
+        col_pizza, col_dispersao = st.columns(2)
+
+        uso_medio_genero = dados_graficos.groupby(col_genero)[col_uso_ia].mean().sort_values(ascending=False)
+        with col_pizza:
+            st.markdown("**Média de uso de ferramentas de IA por gênero**")
+            if not uso_medio_genero.empty and uso_medio_genero.sum() > 0:
+                fig, ax = plt.subplots()
+                ax.pie(uso_medio_genero, labels=uso_medio_genero.index, autopct='%1.1f%%')
+                ax.axis('equal')
+                st.pyplot(fig)
+                plt.close(fig)
+            else:
+                st.info("Não há dados suficientes para o gráfico de pizza.")
+
+        with col_dispersao:
+            st.markdown("**Idade x uso de IA, por gênero**")
+            st.scatter_chart(
+                dados_graficos,
+                x=col_idade,
+                y=col_uso_ia,
+                color=col_genero,
+            )
+
+        frequencia_escolaridade = dados_graficos[col_escolaridade].value_counts()
+        st.markdown("**Frequência por nível de escolaridade**")
+        st.bar_chart(frequencia_escolaridade)
+
+        nivel_mais_frequente = frequencia_escolaridade.idxmax() if not frequencia_escolaridade.empty else None
+        idade_media_genero = dados_graficos.groupby(col_genero)[col_idade].mean()
+        if not dados_graficos.empty:
+            genero_maior_uso = uso_medio_genero.idxmax()
+            resumo_idades = "; ".join(
+                f"{genero}: {idade:.1f} anos" for genero, idade in idade_media_genero.items()
+            )
+            resumo = (
+                f"- A maior média de uso de ferramentas de IA é do gênero **{genero_maior_uso}** "
+                f"({uso_medio_genero[genero_maior_uso]:.1f} horas por dia).\n"
+                f"- A idade média por gênero é: {resumo_idades}.\n"
+                f"- O nível de escolaridade mais frequente é **{nivel_mais_frequente}** "
+                f"({frequencia_escolaridade.iloc[0]} estudantes)."
+            )
+            st.subheader("Resumo dos gráficos")
+            st.markdown(resumo)
+    else:
+        st.warning("Não foi possível gerar os gráficos: confira se as colunas de gênero, idade, uso de IA e escolaridade estão disponíveis.")

@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+import altair as alt
 
 st.set_page_config(page_title="Visualizador de Dados de impacto da IA em estudantes", layout="wide")
 st.title("Visualizador de Dados de impacto da IA em estudantes")
@@ -77,22 +78,30 @@ if arquivo_postado is not None:
         with col_pizza:
             st.markdown("**Média de uso de ferramentas de IA por gênero**")
             if not uso_medio_genero.empty and uso_medio_genero.sum() > 0:
-                fig, ax = plt.subplots()
-                ax.pie(uso_medio_genero, labels=uso_medio_genero.index, autopct='%1.1f%%')
-                ax.axis('equal')
-                st.pyplot(fig)
-                plt.close(fig)
+                # Prepara o DataFrame para o Altair
+                df_pizza = uso_medio_genero.reset_index()
+                
+                grafico_pizza = alt.Chart(df_pizza).mark_arc().encode(
+                    theta=alt.Theta(field=col_uso_ia, type="quantitative"),
+                    color=alt.Color(field=col_genero, type="nominal", title="Gênero"),
+                    tooltip=[
+                        alt.Tooltip(field=col_genero, type="nominal", title="Gênero"),
+                        alt.Tooltip(field=col_uso_ia, type="quantitative", title="Média (h/dia)", format=".2f")
+                    ]
+                )
+                st.altair_chart(grafico_pizza, use_container_width=True)
             else:
                 st.info("Não há dados suficientes para o gráfico de pizza.")
 
         with col_dispersao:
             st.markdown("**Idade x uso de IA, por gênero**")
-            st.scatter_chart(
-                dados_graficos,
-                x=col_idade,
-                y=col_uso_ia,
-                color=col_genero,
+            grafico_dispersao = alt.Chart(dados_graficos).mark_circle(size=70).encode(
+                x=alt.X(field=col_idade, type="quantitative", title="Idade"),
+                y=alt.Y(field=col_uso_ia, type="quantitative", title="Uso de ferramentas de IA (h/dia)"),
+                color=alt.Color(field=col_genero, type="nominal", title="Gênero"),
+                tooltip=[col_genero, col_idade, col_uso_ia],
             )
+            st.altair_chart(grafico_dispersao.interactive(), use_container_width=True)
 
         frequencia_escolaridade = dados_graficos[col_escolaridade].value_counts()
         st.markdown("**Frequência por nível de escolaridade**")

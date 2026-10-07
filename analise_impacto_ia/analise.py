@@ -2,12 +2,14 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import altair as alt
+import numpy as np
 
 st.set_page_config(page_title="Visualizador de Dados de impacto da IA em estudantes", layout="wide")
 st.title("Visualizador de Dados de impacto da IA em estudantes")
 
-# 1. Cria o botão de upload na tela
-arquivo_postado = st.file_uploader("Escolha um arquivo:", type=["csv", "xlsx"])
+# 1. Cria o botão de upload na tela'
+with st.sidebar:
+    arquivo_postado = st.file_uploader("Escolha um arquivo:", type=["csv", "xlsx"])
 
 # O código só roda se o usuário realmente enviar um arquivo
 if arquivo_postado is not None:
@@ -114,14 +116,30 @@ if arquivo_postado is not None:
             resumo_idades = "; ".join(
                 f"{genero}: {idade:.1f} anos" for genero, idade in idade_media_genero.items()
             )
-            resumo = (
-                f"- A maior média de uso de ferramentas de IA é do gênero **{genero_maior_uso}** "
-                f"({uso_medio_genero[genero_maior_uso]:.1f} horas por dia).\n"
-                f"- A idade média por gênero é: {resumo_idades}.\n"
-                f"- O nível de escolaridade mais frequente é **{nivel_mais_frequente}** "
-                f"({frequencia_escolaridade.iloc[0]} estudantes)."
-            )
-            st.subheader("Resumo dos gráficos")
-            st.markdown(resumo)
+            # resumo = (
+            #     f"- A maior média de uso de ferramentas de IA é do gênero **{genero_maior_uso}** "
+            #     f"({uso_medio_genero[genero_maior_uso]:.1f} horas por dia).\n"
+            #     f"- A idade média por gênero é: {resumo_idades}.\n"
+            #     f"- O nível de escolaridade mais frequente é **{nivel_mais_frequente}** "
+            #     f"({frequencia_escolaridade.iloc[0]} estudantes)."
+            # )
+            # st.subheader("Resumo dos gráficos")
+            # st.markdown(resumo)
+
+        df_resumo = pd.DataFrame({
+            "Métrica": [
+                "Maior média de uso de IA",
+                "Idade média por gênero",
+                "Nível de escolaridade mais frequente"
+            ],
+            "Resumo": [
+                f"{genero_maior_uso} ({uso_medio_genero[genero_maior_uso]:.1f} h/dia)",
+                resumo_idades,
+                f"{nivel_mais_frequente} ({frequencia_escolaridade.iloc[0]} estudantes)"
+            ]
+        })
+        st.subheader("Resumo em tabela")
+        st.dataframe(df_resumo, use_container_width=True)
+
     else:
         st.warning("Não foi possível gerar os gráficos: confira se as colunas de gênero, idade, uso de IA e escolaridade estão disponíveis.")

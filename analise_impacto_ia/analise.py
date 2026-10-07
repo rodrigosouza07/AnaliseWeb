@@ -116,15 +116,6 @@ if arquivo_postado is not None:
             resumo_idades = "; ".join(
                 f"{genero}: {idade:.1f} anos" for genero, idade in idade_media_genero.items()
             )
-            # resumo = (
-            #     f"- A maior média de uso de ferramentas de IA é do gênero **{genero_maior_uso}** "
-            #     f"({uso_medio_genero[genero_maior_uso]:.1f} horas por dia).\n"
-            #     f"- A idade média por gênero é: {resumo_idades}.\n"
-            #     f"- O nível de escolaridade mais frequente é **{nivel_mais_frequente}** "
-            #     f"({frequencia_escolaridade.iloc[0]} estudantes)."
-            # )
-            # st.subheader("Resumo dos gráficos")
-            # st.markdown(resumo)
 
         df_resumo = pd.DataFrame({
             "Métrica": [
@@ -140,6 +131,5 @@ if arquivo_postado is not None:
         })
         st.subheader("Resumo em tabela")
         st.dataframe(df_resumo, use_container_width=True)
-
     else:
         st.warning("Não foi possível gerar os gráficos: confira se as colunas de gênero, idade, uso de IA e escolaridade estão disponíveis.")

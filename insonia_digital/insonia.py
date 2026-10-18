@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+import altair as alt
 import streamlit as st
 
-# Configuração da página para aproveitar melhor o espaço da tela
+# Configuração da página para aproveitar o espaço máximo da tela
 st.set_page_config(layout="wide", page_title="Análise de Qualidade de Sono", page_icon='💤')
 
 # --- DICIONÁRIOS DE TRADUÇÃO ---
@@ -18,7 +18,7 @@ TRADUCAO_COLUNAS = {
     'primary_app_category': 'Categoria_Principal_App',
     'screen_brightness_pct': 'Brilho_Tela_Pct',
     'blue_light_filter_on': 'Filtro_Luz_Azul_Ativo',
-    'caffeine_intake_mg': 'Consumo_Caffeina_Mg',
+    'caffeine_intake_mg': 'Consumo_Cafeina_Mg', # Corrigido: 'caffeine_intake_mg' com dois 'f's conforme o arquivo original
     'caffeine_last_hour': 'Ultima_Hora_Cafeina',
     'physical_activity_min': 'Atividade_Fisica_Min',
     'room_temperature_f': 'Temperatura_Quarto_F',
@@ -45,7 +45,7 @@ MAPEAMENTO_VALORES = {
 def carregar_e_traduzir_dados(arquivo):
     df_raw = pd.read_csv(arquivo)
     
-    # Traduz os valores categóricos dentro das colunas
+    # Traduz os valores categóricos dentro das colunas antes de renomear as colunas
     for coluna, mapeamento in MAPEAMENTO_VALORES.items():
         if coluna in df_raw.columns:
             df_raw[coluna] = df_raw[coluna].map(mapeamento).fillna(df_raw[coluna])
@@ -90,16 +90,17 @@ with st.sidebar:
         luz_azul = st.radio("Filtro de Luz Azul Celular:", options=["Todos", "Ativado", "Desativado"])
         
         st.divider()
-        st.caption("Dashboard de Qualidade de Sono v3.0")
+        st.caption("Dashboard Corrigido v4.3")
 
 # --- CONTEÚDO PRINCIPAL ---
 st.title("📊 Painel Avançado de Análise do Sono")
 
 if df is not None:
     # --- APLICANDO OS FILTROS NO DATAFRAME ---
+    # Corrigido para extrair o intervalo mínimo e máximo da tupla do slider de idade
     df_filtrado = df[
         (df['Genero'].isin(generos_sel)) &
-        (df['Idade'].between(idade_sel[0], idades_sel[1] if 'idades_sel' in locals() else idade_sel[1])) &
+        (df['Idade'].between(idade_sel[0], idade_sel[1])) &
         (df['Profissao'].isin(prof_sel)) &
         (df['Cronotipo'].isin(crono_sel))
     ]
@@ -120,73 +121,81 @@ if df is not None:
         horas_medias = df_filtrado['Total_Horas_Sono'].mean() if not df_filtrado.empty else 0
         st.metric("Média de Horas Dormidas", f"{horas_medias:.1f}h")
     with col4:
-        cafe_medio = df_filtrado['Consumo_Caffeina_Mg'].mean() if not df_filtrado.empty else 0
-        st.metric("Consumo Médio de Cafeína", f"{cafe_medio:.0f} mg")
+        latencia_media = df_filtrado['Tempo_Ate_Pegar_No_Sono_Min'].mean() if not df_filtrado.empty else 0
+        st.metric("Média para Pegar no Sono", f"{latencia_media:.1f} min")
         
     st.divider()
     
     if not df_filtrado.empty:
-        # --- BLOCO DE GRÁFICOS 1 & 2 ---
+        # --- LINHA 1 DE GRÁFICOS ---
         g1, g2 = st.columns(2)
         
         with g1:
-            st.write("### ☕ Impacto do Consumo de Cafeína na Eficiência")
-            fig1, ax1 = plt.subplots(figsize=(6, 4))
-            ax1.scatter(df_filtrado['Consumo_Caffeina_Mg'], df_filtrado['Eficiencia_Sono_Pct'], color='#D2691E', alpha=0.5, edgecolors='none')
+            st.write("### ☕ Cafeína vs. Eficiência de Sono")
             
-            # Adiciona linha de tendência se houver dados suficientes
-            if len(df_filtrado) > 1:
-                m, b = np.polyfit(df_filtrado['Consumo_Caffeina_Mg'], df_filtrado['Eficiencia_Sono_Pct'], 1)
-                x_vals = np.array([df_filtrado['Consumo_Caffeina_Mg'].min(), df_filtrado['Consumo_Caffeina_Mg'].max()])
-                ax1.plot(x_vals, m*x_vals + b, color='red', linestyle='--', linewidth=2, label='Tendência')
+            # Plot dos pontos de dispersão interativos
+            pontos = alt.Chart(df_filtrado).encode(
+                x=alt.X('Consumo_Cafeina_Mg:Q', title='Consumo de Cafeína (mg)'),
+                y=alt.Y('Eficiencia_Sono_Pct:Q', title='Eficiência do Sono (%)', scale=alt.Scale(domain=[50, 100]))
+            ).mark_circle(size=60, color='#D2691E', opacity=0.6).encode(
+                tooltip=['ID_Usuario', 'Idade', 'Consumo_Cafeina_Mg', 'Eficiencia_Sono_Pct']
+            )
             
-            ax1.set_xlabel("Cafeína (mg)")
-            ax1.set_ylabel("Eficiência do Sono (%)")
-            ax1.grid(True, linestyle=':', alpha=0.6)
-            fig1.patch.set_facecolor('none')
-            ax1.set_facecolor('none')
-            st.pyplot(fig1)
+            # Cálculo estável da linha de tendência em Python puro
+            if len(df_filtrado) > 1 and df_filtrado['Consumo_Cafeina_Mg'].nunique() > 1:
+                m, b = np.polyfit(df_filtrado['Consumo_Cafeina_Mg'], df_filtrado['Eficiencia_Sono_Pct'], 1)
+                x_min, x_max = df_filtrado['Consumo_Cafeina_Mg'].min(), df_filtrado['Consumo_Cafeina_Mg'].max()
+                df_linha = pd.DataFrame({
+                    'Consumo_Cafeina_Mg': [x_min, x_max],
+                    'Eficiencia_Sono_Pct': [m * x_min + b, m * x_max + b]
+                })
+                linha_tendencia = alt.Chart(df_linha).mark_line(color='red', size=3).encode(
+                    x='Consumo_Cafeina_Mg:Q',
+                    y='Eficiencia_Sono_Pct:Q'
+                )
+                grafico_cafeina = (pontos + linha_tendencia).properties(height=350).interactive()
+            else:
+                grafico_cafeina = pontos.properties(height=350).interactive()
+                
+            st.altair_chart(grafico_cafeina, use_container_width=True)
             
         with g2:
             st.write("### 💼 Eficiência Média do Sono por Profissão")
-            fig2, ax2 = plt.subplots(figsize=(6, 4))
-            dados_prof = df_filtrado.groupby('Profissao')['Eficiencia_Sono_Pct'].mean().sort_values()
+            grafico_profissao = alt.Chart(df_filtrado).mark_bar(color='#4E79A7', height=20).encode(
+                x=alt.X('mean(Eficiencia_Sono_Pct):Q', title='Eficiência Média (%)', scale=alt.Scale(domain=[50, 100])),
+                y=alt.Y('Profissao:N', title='Profissão', sort='-x'),
+                tooltip=[alt.Tooltip('mean(Eficiencia_Sono_Pct):Q', title='Eficiência Média', format='.1f')]
+            ).properties(height=350)
             
-            cores = plt.cm.Blues(np.linspace(0.4, 0.8, len(dados_prof)))
-            ax2.barh(dados_prof.index, dados_prof.values, color=cores, height=0.6)
-            ax2.set_xlabel("Eficiência Média (%)")
-            ax2.set_xlim(0, 100)
-            for i, v in enumerate(dados_prof.values):
-                ax2.text(v + 1, i, f"{v:.1f}%", va='center', fontweight='bold', fontsize=9)
-                
-            fig2.patch.set_facecolor('none')
-            ax2.set_facecolor('none')
-            st.pyplot(fig2)
+            st.altair_chart(grafico_profissao, use_container_width=True)
             
         st.divider()
         
-        # --- BLOCO DE GRÁFICOS 3 & TABELA ---
-        g3, g4 = st.columns([1, 2])
+        # --- LINHA 2 DE GRÁFICOS ---
+        g3, g4 = st.columns(2)
         
         with g3:
-            st.write("### 🕒 Distribuição de Perfil Biológico")
-            fig3, ax3 = plt.subplots(figsize=(4, 4))
-            dados_crono = df_filtrado['Cronotipo'].value_counts()
+            st.write("### 📱 Tempo de Tela vs. Tempo para Pegar no Sono")
+            grafico_tela = alt.Chart(df_filtrado).mark_circle(size=60, opacity=0.6).encode(
+                x=alt.X('Tempo_Tela_Antes_Dormir_Min:Q', title='Tempo de Tela Antes de Dormir (min)'),
+                y=alt.Y('Tempo_Ate_Pegar_No_Sono_Min:Q', title='Tempo até Pegar no Sono (min)'),
+                color=alt.Color('Cronotipo:N', title='Cronotipo'),
+                tooltip=['ID_Usuario', 'Tempo_Tela_Antes_Dormir_Min', 'Tempo_Ate_Pegar_No_Sono_Min', 'Cronotipo']
+            ).properties(height=350).interactive()
             
-            ax3.pie(dados_crono.values, labels=dados_crono.index, autopct='%1.1f%%', 
-                    startangle=90, colors=['#4E79A7', '#F28E2B', '#E15759'], 
-                    textprops={'fontsize': 9}, wedgeprops={'edgecolor': 'w', 'linewidth': 1})
-            
-            fig3.patch.set_facecolor('none')
-            st.pyplot(fig3)
+            st.altair_chart(grafico_tela, use_container_width=True)
             
         with g4:
-            st.write("### 📋 Planilha de Dados Filtrados")
-            # Mostra as colunas principais já em português na tabela interativa
-            colunas_exibicao = ['ID_Usuario', 'Idade', 'Genero', 'Profissao', 'Cronotipo', 'Total_Horas_Sono', 'Eficiencia_Sono_Pct', 'Divida_Sono_Categoria']
-            st.dataframe(df_filtrado[colunas_exibicao].head(10), use_container_width=True)
+            st.write("### 📦 Eficiência de Sono por Categoria de Dívida de Sono")
+            grafico_boxplot = alt.Chart(df_filtrado).mark_boxplot(extent='min-max', size=40).encode(
+                x=alt.X('Divida_Sono_Categoria:N', title='Categoria de Dívida de Sono', sort=['Sem Dívida', 'Leve', 'Moderada', 'Grave']),
+                y=alt.Y('Eficiencia_Sono_Pct:Q', title='Eficiência do Sono (%)', scale=alt.Scale(domain=[50, 100])),
+                color=alt.Color('Divida_Sono_Categoria:N', legend=None)
+            ).properties(height=350)
+            
+            st.altair_chart(grafico_boxplot, use_container_width=True)
             
     else:
         st.warning("⚠️ Nenhuma informação foi encontrada para a combinação de filtros selecionada na barra lateral.")
 else:
-    st.info("💡 Pronto! Agora basta ir na barra lateral e arrastar seu arquivo CSV para gerar o dashboard completo traduzido.")
+    st.info("💡 Pronto! Agora basta ir na barra lateral e arrastar seu arquivo CSV para gerar o dashboard interativo em Altair.")
